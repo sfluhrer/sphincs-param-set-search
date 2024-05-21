@@ -1,0 +1,74 @@
+This is the program that lists the potential Sphincs+ parameter sets,
+given the target requirements (security level, number of signatures at
+that security level, overuse characteristics).
+
+It is a Linux executable; it should be fairly portable (I hope).
+
+To build, go to the directory that the source is in and say:
+   make search
+
+When you execute it, it searches for 'good' parameter sets that meet the
+specified criteria; you can do this by saying:
+
+    ./search s=128 n=20 sign=100000 tests=112 maxs=30 label=A
+
+This will print to stdout the Latex table of parameter sets it found, and
+also generate A-*.csv files the listing of the security level at various
+numbers of signatures (from 19 to 40), in a format that can be used as a
+GnuPlot data file.
+
+The meanings of the parameters:
+
+
+    s=128  This is the target security level; it must be specified
+           128 = NIST level 1, 192 = level 3, 256 = level 5
+           The example specifies NIST level 1.
+    n=20   Number of the log2 of the number of signatures we must be able to
+           sign and maintain teh target security level; it must be specified.
+           The example specifies that 2^20 signatures must be generated
+    sign=100000 Maximum number of hashes that we are alloed to do during
+           signing generation; it must be specified
+           The example specifies that no more than 100,000 hashes can be
+           computed
+    tests=112 This specifies the security level we test for 'overuse'.  To
+           check for how well the parameter set deals with overuse, we compute
+           how many signatures we can generate and still retain this level of
+           security; more signatures is better.
+           The example specifies that we use the security level 112 bits as
+           the benchmark
+    maxs=30 This specifies when to stop listing parameter sets; once we hit a
+           parameter set who retains the 'tests' security level at this many
+           signatures, we stop listing any further.
+           The example specifies to stop listing parameter sets once 2^30
+           signatures retain at least 112 bits of security
+    label=A This specifies that these parameter sets will be labeled 'A'; this
+           label appears on the output, and also is used as a part of the
+           filenames for the overuse .csv files.
+           If this is not specified, then the ID in the output will just have
+           the parameter set number, and no CSV files will be generated.
+
+In addition, we provide some addition parameters that can be used to
+restrict the options that program considers.  While typically not useful for
+general parameter set searching, they can be useful if you're interested in
+a specific parameter set
+    d=#    Only consider parameter sets with the specified tree depth
+    h=#    Only consider parameter sets with the specified merkle height
+           (note that this it height of an individual Merkle tree, not the
+           total Hypertree height)
+    a=#    Only consider parameter sets with the specified number of FORS
+           trees.
+
+
+It generates output in a format that is friendly to Latex/GnuPlot, to make
+it easy for us - we can insert it directly into the paper without any human
+interaction potentially causing errors.
+
+It lists the parameter sets it finds in smallest-signature-first order.  It
+does not list any parameter sets which it considers strictly worse than one
+it has already found.  By 'strictly worse', I mean worse in all three of these
+criteria:
+  - Signature size
+  - Overuse characteristic (that is, the number of signatures that can be
+    generated while retaining security at the 'secondary security level')
+  - Parameter sets with W=16 are considered better than ones with W=4,256,
+    which are considered better than ones with W=2,8,32,64,128
