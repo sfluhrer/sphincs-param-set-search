@@ -130,10 +130,12 @@ double compute_sec_level( double m, int H, int T, int K ) {
             /*
              * If prob_not_get_g_hit is sufficiently small, the subtraction
              * will lose significant bits (or just result in 1)
-             * In this regime, the linear approximation, that is, the first
-             * term in the Taylor expansion, gives us a more accurate value
+             * In this regime, the quadratic approximation, that is, the first
+             * two terms in the Taylor expansion, gives us a more accurate
+	     * value
              */
-            log_b = -K * prob_not_get_g_hit / log(2.0);
+            log_b = -K * (prob_not_get_g_hit / log(2.0) + 
+	               prob_not_get_g_hit*prob_not_get_g_hit / (2*log(2.0)));
         } else {
             /*
              * prob_not_get_g_hit is still large enough; compute it directly
@@ -227,10 +229,12 @@ int check_sec_level( double m, int H, int T, int K, double sec_level ) {
             /*
              * If prob_not_get_g_hit is sufficiently small, the subtraction
              * will lose significant bits (or just result in 1)
-             * In this regime, the linear approximation, that is, the first
-             * term in the Taylor expansion, gives us a more accurate value
+             * In this regime, the quadratic approximation, that is, the first
+             * two terms in the Taylor expansion, gives us a more accurate
+	     * value
              */
-            log_b = -K * prob_not_get_g_hit / log(2.0);
+            log_b = -K * (prob_not_get_g_hit / log(2.0) + 
+	               prob_not_get_g_hit*prob_not_get_g_hit / (2*log(2.0)));
         } else {
             /*
              * prob_not_get_g_hit is still large enough; compute it directly
