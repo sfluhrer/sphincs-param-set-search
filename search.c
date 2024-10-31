@@ -10,12 +10,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 #include "search.h"
 #include "gamma.h"
 
 #define MAX_K   100 /* SANITY LIMIT */
                     /* Don't bother checking any parameter set with more */
                     /* than 100 FORS trees */
+
+/*
+ * Return a/b, rounded up
+ */
+static unsigned divru( unsigned a, unsigned b ) {
+    return (a+b-1)/b;
+}
 
 /*
  * An instance of this structure stands for a parameter set we found (not
@@ -81,6 +89,14 @@ static struct parameter_set *my_merge( struct parameter_set *a, struct parameter
         *tail = b;
     }
     return list;
+}
+
+static int ilog2( unsigned n ) {
+    int i;
+    for (i=0; n>1; i++, n >>= 1) {
+	;
+    }
+    return i;
 }
 
 /*
@@ -395,18 +411,27 @@ void do_search( int sec_level, unsigned num_sig,
 
     /* And start printing out the table, in the format that can be pasted */
     /* directly into the Latex document */
-    printf( "\\begin{longtable}{c|c|c|c|c|c|c|c|c|c}\n" );
+    printf( "\\begin{longtable}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}\n" );
+    printf( "      &     &     &     &      &     &     &        &     & sec  &  pk   &  sig  & \\\% & sign & verify & sigs at & overuse \\\\\n" );
+    printf( "   ID & $n$ & $h$ & $d$ & $h'$ & $a$ & $k$ & $lg_w$ & $m$ & cat. & bytes & bytes & size & time & time   & level %d & safety \\\\\n", test_sec_level );
+#if 0
     printf( "   ID & H  &  D &  A &  K &  W  &  SigSize & Sign Time & Verify Time & Sigs/level %d \\\\\n", test_sec_level );
-    printf( "  \\hline\n" );
+#endif
+    printf( "  \\hline \\endhead\n" );
 
-    /* Now, step through the lists, and show the good entries */
+    /* Gather up the parameter sets to print */
+    struct parameter_set *print_list = 0, **end_print_list;
+    end_print_list = &print_list;
+
+    /* Now, step through the lists, and select 'the good entries' */
     int min_sec_level[3] = { 0, 0, 0 };  /* This is the 'overuse' level of */
                 /* the three W types.  That is, the highest value we've seen */
                 /* of 100 * log2 of the number of signatures that still */
                 /* achieve the secondary security level (test_sec_level) */
                
     int cutoff[3] = { 0, 0, 0 };
-    int count = 0;
+    unsigned smallest_sig = UINT_MAX;
+//    unsigned smallest_overuse = UINT_MAX;
     while (w16_q || w256_q || wother_q) {
 
         /* Get the next 'best' parameter set */
@@ -450,6 +475,42 @@ void do_search( int sec_level, unsigned num_sig,
         }
 
         /* We decided to output this parameter set */
+	*end_print_list = p;
+	end_print_list = &p->link;
+	p->link = 0;
+
+	/* And record the smallest sig size */
+	if (p->sig_size < smallest_sig) smallest_sig = p->sig_size;
+	/* And the largest overuse value */
+//	if (overuse < smallest_overuse) smallest_overuse = overuse;
+
+        /*
+         * Record how good this parameter set was (so we don't list any
+         * latter ones which aren't better than this one)
+         */
+        int do_cutoff = max_s && (overuse/100 >= max_s); /* Set if this */
+                  /* parameter set exceeded our top level limit, so we */
+                  /* don't feel the need to list any more) */
+
+        /*
+         * W=16 parameter sets also block any other parameter sets which
+         *      aren't better
+         * W=4,256 parameter sets also block any W=2,8,32,64,128 parameter
+         *      sets which aren't better
+         */
+        for (int j=winner; j<3; j++) {
+            if (overuse > min_sec_level[j]) min_sec_level[j] = overuse;
+            cutoff[j] |= do_cutoff;
+        }
+        if (cutoff[0]) break;  /* If we've blocked everything, we might */
+                               /* as well stop going through the lists */
+    }
+
+    /* Ok, we have the list - print them out */
+    int count = 0;
+    for (; print_list; print_list = print_list->link) {
+        struct parameter_set *p = print_list;
+
         count++;
         if (label) {
             printf( "  %s-", label );
@@ -459,11 +520,23 @@ void do_search( int sec_level, unsigned num_sig,
         } else {
             printf( "  %4d & ", count );
         } 
+	int m = divru(p->h - p->h/p->d, 8) + divru(p->h/p->d, 8) + divru(p->a*p->k, 8);
+        int overuse = compute_sigs_at_sec_level( test_sec_level, p->h, p->a, p->k );
+//	int delta_overuse = overuse - smallest_overuse;
+        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\\% & % 9d & % 11d & %d.%02d & %u \\\\\n",
+	         sec_level/8,
+                       p->h, p->d, p->h/p->d, p->a, p->k, ilog2(p->w), m,
+		       (sec_level/64)*2 - 3, 2*(sec_level/8),
+		                           p->sig_size, 100*p->sig_size / smallest_sig, p->sig_time,
+                                                               p->ver_time,
+                   overuse/100, overuse % 100, (unsigned)pow(2, (float)overuse/100 - num_sig ) );
+#if 0
         printf( "%2d & %2d & %2d & %2d & %3d & % 8d & % 9d & % 11d & %d.%02d \\\\\n",
                  p->h, p->d,  p->a,p->k, p->w,   p->sig_size,
                                                         p->sig_time,
                                                                p->ver_time,
                    overuse/100, overuse % 100 );
+#endif
 
         /* If the user asked for the overuse graph being dumped to a file, */
         /* compute and write those values */
@@ -487,27 +560,6 @@ void do_search( int sec_level, unsigned num_sig,
             fclose(f);
 skip_file_output:;
         }
-
-        /*
-         * Record how good this parameter set was (so we don't list any
-         * latter ones which aren't better than this one)
-         */
-        int do_cutoff = max_s && (overuse/100 >= max_s); /* Set if this */
-                  /* parameter set exceeded our top level limit, so we */
-                  /* don't feel the need to list any more) */
-
-        /*
-         * W=16 parameter sets also block any other parameter sets which
-         *      aren't better
-         * W=4,256 parameter sets also block any W=2,8,32,64,128 parameter
-         *      sets which aren't better
-         */
-        for (int j=winner; j<3; j++) {
-            if (overuse > min_sec_level[j]) min_sec_level[j] = overuse;
-            cutoff[j] |= do_cutoff;
-        }
-        if (cutoff[0]) break;  /* If we've blocked everything, we might */
-                               /* as well stop going through the lists */
     }
 
     /*
