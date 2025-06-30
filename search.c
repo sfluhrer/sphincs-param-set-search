@@ -412,7 +412,7 @@ void do_search( int sec_level, unsigned num_sig,
     /* And start printing out the table, in the format that can be pasted */
     /* directly into the Latex document */
     printf( "\\begin{longtable}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}\n" );
-    printf( "      &     &     &     &      &     &     &        &     & sec  &  pk   &  sig  & \\\% & sign & verify & sigs at & overuse \\\\\n" );
+    printf( "      &     &     &     &      &     &     &        &     & sec  &  pk   &  sig  & \\%% & sign & verify & sigs at & overuse \\\\\n" );
     printf( "   ID & $n$ & $h$ & $d$ & $h'$ & $a$ & $k$ & $lg_w$ & $m$ & cat. & bytes & bytes & size & time & time   & level %d & safety \\\\\n", test_sec_level );
 #if 0
     printf( "   ID & H  &  D &  A &  K &  W  &  SigSize & Sign Time & Verify Time & Sigs/level %d \\\\\n", test_sec_level );
@@ -523,7 +523,7 @@ void do_search( int sec_level, unsigned num_sig,
 	int m = divru(p->h - p->h/p->d, 8) + divru(p->h/p->d, 8) + divru(p->a*p->k, 8);
         int overuse = compute_sigs_at_sec_level( test_sec_level, p->h, p->a, p->k );
 //	int delta_overuse = overuse - smallest_overuse;
-        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\\% & % 9d & % 11d & %d.%02d & %u \\\\\n",
+        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\%% & % 9d & % 11d & %d.%02d & %u \\\\\n",
 	         sec_level/8,
                        p->h, p->d, p->h/p->d, p->a, p->k, ilog2(p->w), m,
 		       (sec_level/64)*2 - 3, 2*(sec_level/8),
