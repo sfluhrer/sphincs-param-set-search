@@ -47,6 +47,7 @@ static void usage(const char *program) {
                      "    tests=# The test security level for overuse\n"
                      "    maxs=# Stop listing parameter sets once they hit\n"
                      "           log2 number of signatures for overuse security\n"
+		     "    ver    Consider verification time as part of the criteria\n"
                      "    label=string Prefix each entry with the given label\n"
                      "    d=#    Only consider parameter sets with the specified tree depth\n"
                      "    h=#    Only consider parameter sets with the specified merkle height\n"
@@ -64,6 +65,7 @@ int main(int argc, char **argv) {
     int sign_op = 0;
     int test_s = 0;
     int max_s = 0;
+    int ver = 0;
     int d = 0;
     int h = 0;
     int a = 0;
@@ -93,6 +95,10 @@ int main(int argc, char **argv) {
         else if ((t = get_int_param( argv[i], "maxs=" )) != 0) {
             max_s = t;
         }
+	/* Check for the verification adjective */
+	else if (0 == strcmp( argv[i], "ver" )) {
+	    ver = 1;
+	}
         /* Check for the label */
         else if (0 == strncmp( argv[i], "label=", 6 )) {
             label = &argv[i][6];
@@ -140,7 +146,7 @@ int main(int argc, char **argv) {
     }
 
     /* Pass the parameters to the searcher */
-    do_search( sec_level, num_sig, test_s, sign_op, max_s, label, d, h, a );
+    do_search( sec_level, num_sig, test_s, sign_op, max_s, label, d, h, a, ver );
 
     return 0;
 }
