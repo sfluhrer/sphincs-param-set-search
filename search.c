@@ -38,7 +38,7 @@ struct parameter_set {
     unsigned char k;             /* Number of FORS trees */
     unsigned short w;            /* Winternitz parameter used */
     unsigned sig_size;           /* Size of the signature */
-    unsigned sig_time;           /* Number of hashes computed during signing */
+    unsigned long long sig_time; /* Number of hashes computed during signing */
     unsigned ver_time;           /* Number of hashes computed during verif */
     unsigned q;                  /* The "quality" of this parameter set */
                                  /* Smaller is better */
@@ -162,7 +162,7 @@ static struct parameter_set *my_sort( struct parameter_set *list ) {
  * This uses a static buffer, the string should be used before this is
  * called again; don't use it multiple times in the same printf
  */
-static char *commify( unsigned n ) {
+static char *commify( unsigned long long n ) {
     static char buffer[100];
     int z = 100;
     buffer[--z] = 0;
@@ -191,7 +191,7 @@ static char *commify( unsigned n ) {
  *                signatures we can generate while still maintaining this
  *                lower security level.  More signatures means that the
  *                parameter set has better overuse characteristics
- * sign_op        - The maximum number of signatures that we can consider doing
+ * sign_op        - The maximum number of hashes that we can consider doing
  *                a signature generation operation
  * max_s        - The highest level of secondary signature usage we can
  *                consider.  That is, once we get a parameter set that
@@ -211,7 +211,8 @@ static char *commify( unsigned n ) {
  *                deciding which parameter sets to output
  */
 void do_search( int sec_level, unsigned num_sig,
-                unsigned test_sec_level, unsigned sign_op, int max_s,
+                unsigned test_sec_level, unsigned long long sign_op,
+	       	unsigned max_s,
                 char *label, int d_restrict, int h_restrict, int a_restrict,
 	        int ver_flag ) {
     unsigned w, log_w;
@@ -547,7 +548,7 @@ void do_search( int sec_level, unsigned num_sig,
 	int m = divru(p->h - p->h/p->d, 8) + divru(p->h/p->d, 8) + divru(p->a*p->k, 8);
         int overuse = compute_sigs_at_sec_level( test_sec_level, p->h, p->a, p->k );
 //	int delta_overuse = overuse - smallest_overuse;
-        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\\% & % 9d & % 11d & %d.%02d & %u \\\\\n",
+        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\\% & % 9llu & % u & %d.%02d & %u \\\\\n",
 	         sec_level/8,
                        p->h, p->d, p->h/p->d, p->a, p->k, ilog2(p->w), m,
 		       (sec_level/64)*2 - 3, 2*(sec_level/8),
@@ -555,7 +556,7 @@ void do_search( int sec_level, unsigned num_sig,
                                                                p->ver_time,
                    overuse/100, overuse % 100, (unsigned)pow(2, (float)overuse/100 - num_sig ) );
 #if 0
-        printf( "%2d & %2d & %2d & %2d & %3d & % 8d & % 9d & % 11d & %d.%02d \\\\\n",
+        printf( "%2d & %2d & %2d & %2d & %3d & % 8d & % 9lld & % 1d & %d.%02d \\\\\n",
                  p->h, p->d,  p->a,p->k, p->w,   p->sig_size,
                                                         p->sig_time,
                                                                p->ver_time,

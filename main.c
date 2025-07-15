@@ -14,7 +14,7 @@
  * Routine used to parse parameters in the form XXX=<number>
  * It returns either 0 (parameter wasn't of that form) or the value of <number>
  */
-static unsigned long get_int_param( const char *arg, const char *param_name ) {
+static unsigned long long get_int_param( const char *arg, const char *param_name ) {
     /*
      * Check if we have the expected prefix
      */
@@ -26,7 +26,7 @@ static unsigned long get_int_param( const char *arg, const char *param_name ) {
     if (!isdigit( *arg )) return 0; /* Not followed by a number */
 
     /* We do; convert the number, and return it */
-    unsigned long val = 0;
+    unsigned long long val = 0;
     do {
         val = 10*val + *arg++ - '0';
     } while (isdigit( *arg ));
@@ -62,7 +62,7 @@ static void usage(const char *program) {
 int main(int argc, char **argv) {
     int sec_level = 0;
     int num_sig = 0;
-    int sign_op = 0;
+    unsigned long long sign_op = 0;
     int test_s = 0;
     int max_s = 0;
     int ver = 0;
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 
     /* Parse the parameters */
     for (i=1; i<argc; i++) {
-        unsigned long t;
+        unsigned long long t;
         /* Check for security level */
         if ((t = get_int_param( argv[i], "s=" )) != 0) {
             sec_level = t;
