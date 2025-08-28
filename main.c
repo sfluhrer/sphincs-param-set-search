@@ -14,7 +14,7 @@
  * Routine used to parse parameters in the form XXX=<number>
  * It returns either 0 (parameter wasn't of that form) or the value of <number>
  */
-static unsigned long get_int_param( const char *arg, const char *param_name ) {
+static unsigned long long get_int_param( const char *arg, const char *param_name ) {
     /*
      * Check if we have the expected prefix
      */
@@ -26,7 +26,7 @@ static unsigned long get_int_param( const char *arg, const char *param_name ) {
     if (!isdigit( *arg )) return 0; /* Not followed by a number */
 
     /* We do; convert the number, and return it */
-    unsigned long val = 0;
+    unsigned long long val = 0;
     do {
         val = 10*val + *arg++ - '0';
     } while (isdigit( *arg ));
@@ -47,6 +47,7 @@ static void usage(const char *program) {
                      "    tests=# The test security level for overuse\n"
                      "    maxs=# Stop listing parameter sets once they hit\n"
                      "           log2 number of signatures for overuse security\n"
+		     "    ver    Consider verification time as part of the criteria\n"
                      "    label=string Prefix each entry with the given label\n"
                      "    d=#    Only consider parameter sets with the specified tree depth\n"
                      "    h=#    Only consider parameter sets with the specified merkle height\n"
@@ -61,9 +62,10 @@ static void usage(const char *program) {
 int main(int argc, char **argv) {
     int sec_level = 0;
     int num_sig = 0;
-    int sign_op = 0;
+    unsigned long long sign_op = 0;
     int test_s = 0;
     int max_s = 0;
+    int ver = 0;
     int d = 0;
     int h = 0;
     int a = 0;
@@ -72,7 +74,7 @@ int main(int argc, char **argv) {
 
     /* Parse the parameters */
     for (i=1; i<argc; i++) {
-        unsigned long t;
+        unsigned long long t;
         /* Check for security level */
         if ((t = get_int_param( argv[i], "s=" )) != 0) {
             sec_level = t;
@@ -93,6 +95,10 @@ int main(int argc, char **argv) {
         else if ((t = get_int_param( argv[i], "maxs=" )) != 0) {
             max_s = t;
         }
+	/* Check for the verification adjective */
+	else if (0 == strcmp( argv[i], "ver" )) {
+	    ver = 1;
+	}
         /* Check for the label */
         else if (0 == strncmp( argv[i], "label=", 6 )) {
             label = &argv[i][6];
@@ -140,7 +146,7 @@ int main(int argc, char **argv) {
     }
 
     /* Pass the parameters to the searcher */
-    do_search( sec_level, num_sig, test_s, sign_op, max_s, label, d, h, a );
+    do_search( sec_level, num_sig, test_s, sign_op, max_s, label, d, h, a, ver );
 
     return 0;
 }

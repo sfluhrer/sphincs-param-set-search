@@ -38,8 +38,11 @@ struct parameter_set {
     unsigned char k;             /* Number of FORS trees */
     unsigned short w;            /* Winternitz parameter used */
     unsigned sig_size;           /* Size of the signature */
-    unsigned sig_time;           /* Number of hashes computed during signing */
+    unsigned long long sig_time; /* Number of hashes computed during signing */
     unsigned ver_time;           /* Number of hashes computed during verif */
+    unsigned q;                  /* The "quality" of this parameter set */
+                                 /* Smaller is better */
+                                 /* Either sig_size or ver_time */ 
 };
 
 /*
@@ -47,9 +50,9 @@ struct parameter_set {
  * one we consider 'better'
  */
 static int my_compare( struct parameter_set *a, struct parameter_set *b ) {
-    /* Smallest signature size wins */
-    if (a->sig_size < b->sig_size) return  1;
-    if (a->sig_size > b->sig_size) return -1;
+    /* Smallest quality (signature size or verification time)  wins */
+    if (a->q < b->q) return  1;
+    if (a->q > b->q) return -1;
 
     /* If equal, the smallest sign_time wins */
     if (a->sig_time < b->sig_time) return  1;
@@ -159,7 +162,7 @@ static struct parameter_set *my_sort( struct parameter_set *list ) {
  * This uses a static buffer, the string should be used before this is
  * called again; don't use it multiple times in the same printf
  */
-static char *commify( unsigned n ) {
+static char *commify( unsigned long long n ) {
     static char buffer[100];
     int z = 100;
     buffer[--z] = 0;
@@ -188,7 +191,7 @@ static char *commify( unsigned n ) {
  *                signatures we can generate while still maintaining this
  *                lower security level.  More signatures means that the
  *                parameter set has better overuse characteristics
- * sign_op        - The maximum number of signatures that we can consider doing
+ * sign_op        - The maximum number of hashes that we can consider doing
  *                a signature generation operation
  * max_s        - The highest level of secondary signature usage we can
  *                consider.  That is, once we get a parameter set that
@@ -204,10 +207,14 @@ static char *commify( unsigned n ) {
  *                overuse characteristics of a specific parameter set (which
  *                might not happen to be one of the 'best' parameter sets
  *                listed by default).
+ * ver_flag     - Set if we need to take verification time into account when
+ *                deciding which parameter sets to output
  */
 void do_search( int sec_level, unsigned num_sig,
-                unsigned test_sec_level, unsigned sign_op, int max_s,
-                char *label, int d_restrict, int h_restrict, int a_restrict ) {
+                unsigned test_sec_level, unsigned long long sign_op,
+	       	unsigned max_s,
+                char *label, int d_restrict, int h_restrict, int a_restrict,
+	        int ver_flag ) {
     unsigned w, log_w;
 
     /*
@@ -395,6 +402,16 @@ void do_search( int sec_level, unsigned num_sig,
                          *   - Walk up the Merkle auth path (h_merkle)
                          */
                         p->ver_time = 1 + k * (a+1) + 1 + d * (wd * w/2 + 1 + h_merkle);
+
+			/*
+			 * And the 'quality' of this parameter set
+			 */
+			if (ver_flag) {
+			    p->q = p->ver_time;
+			} else {
+			    p->q = p->sig_size;
+			}
+
                         p->link = *current_list;
                         *current_list = p;
                     }
@@ -412,7 +429,7 @@ void do_search( int sec_level, unsigned num_sig,
     /* And start printing out the table, in the format that can be pasted */
     /* directly into the Latex document */
     printf( "\\begin{longtable}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}\n" );
-    printf( "      &     &     &     &      &     &     &        &     & sec  &  pk   &  sig  & \\%% & sign & verify & sigs at & overuse \\\\\n" );
+    printf( "      &     &     &     &      &     &     &        &     & sec  &  pk   &  sig  & \\\% & sign & verify & sigs at & overuse \\\\\n" );
     printf( "   ID & $n$ & $h$ & $d$ & $h'$ & $a$ & $k$ & $lg_w$ & $m$ & cat. & bytes & bytes & size & time & time   & level %d & safety \\\\\n", test_sec_level );
 #if 0
     printf( "   ID & H  &  D &  A &  K &  W  &  SigSize & Sign Time & Verify Time & Sigs/level %d \\\\\n", test_sec_level );
@@ -440,13 +457,14 @@ void do_search( int sec_level, unsigned num_sig,
             /* Start with the best W=16 parameter set */
         { p = w16_q; winner = 0; }
             /* Switch to the best W=4,256 parameter set if it is better */
-        if (!p || (w256_q && w256_q->sig_size < p->sig_size)) {
+        if (!p || (w256_q && w256_q->q < p->q)) {
             p = w256_q; winner = 1;
         }
             /* Switch to the best W=2,8,32,64,128 parameter set if better */
-        if (!p || (wother_q && wother_q->sig_size < p->sig_size)) {
+        if (!p || (wother_q && wother_q->q < p->q)) {
             p = wother_q; winner = 2;
         }
+	if (!p) break;
 
         /* Pull the winner off of its list */
         switch (winner) {
@@ -497,7 +515,14 @@ void do_search( int sec_level, unsigned num_sig,
          *      aren't better
          * W=4,256 parameter sets also block any W=2,8,32,64,128 parameter
          *      sets which aren't better
+	 * We disable this logic if we're searching based on ver time
          */
+	if (ver_flag) {
+            if (overuse > min_sec_level[winner]) min_sec_level[winner] = overuse;
+            cutoff[winner] |= do_cutoff;
+	    if (cutoff[0] && cutoff[1] && cutoff[2]) break;
+	    continue;
+	}
         for (int j=winner; j<3; j++) {
             if (overuse > min_sec_level[j]) min_sec_level[j] = overuse;
             cutoff[j] |= do_cutoff;
@@ -523,7 +548,7 @@ void do_search( int sec_level, unsigned num_sig,
 	int m = divru(p->h - p->h/p->d, 8) + divru(p->h/p->d, 8) + divru(p->a*p->k, 8);
         int overuse = compute_sigs_at_sec_level( test_sec_level, p->h, p->a, p->k );
 //	int delta_overuse = overuse - smallest_overuse;
-        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\%% & % 9d & % 11d & %d.%02d & %u \\\\\n",
+        printf( "%2d & %3d & %2d & %2d & %2d & %2d &   %d  & %2d &    %d     &     %d   & %  8d  & %d\\\% & % 9llu & % u & %d.%02d & %u \\\\\n",
 	         sec_level/8,
                        p->h, p->d, p->h/p->d, p->a, p->k, ilog2(p->w), m,
 		       (sec_level/64)*2 - 3, 2*(sec_level/8),
@@ -531,7 +556,7 @@ void do_search( int sec_level, unsigned num_sig,
                                                                p->ver_time,
                    overuse/100, overuse % 100, (unsigned)pow(2, (float)overuse/100 - num_sig ) );
 #if 0
-        printf( "%2d & %2d & %2d & %2d & %3d & % 8d & % 9d & % 11d & %d.%02d \\\\\n",
+        printf( "%2d & %2d & %2d & %2d & %3d & % 8d & % 9lld & % 1d & %d.%02d \\\\\n",
                  p->h, p->d,  p->a,p->k, p->w,   p->sig_size,
                                                         p->sig_time,
                                                                p->ver_time,
